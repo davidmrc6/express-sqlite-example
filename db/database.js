@@ -1,42 +1,58 @@
-import dbPromise from './connection.js';
+import dbPromise from "./connection.js";
 
 class Database {
+    constructor(tableName = 'entities') {
+        this.tableName = tableName;
+    }
+
     async init() {
         const db = await dbPromise;
         await db.exec(`
-            CREATE TABLE IF NOT EXISTS teams (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL
-            )
-        `);
+        CREATE TABLE IF NOT EXISTS ${this.tableName} (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          data TEXT NOT NULL
+        )
+      `);
     }
 
-    async getAllTeams() {
+    // Get all entities from the database
+    async getAll() {
         const db = await dbPromise;
-        return db.all(`SELECT * FROM teams`);
+        const results = await db.all(`SELECT * FROM ${this.tableName}`);
+        return results.map(row => ({ ...row, data: JSON.parse(row.data) }));
     }
 
-    async getTeamById(id) {
+    // Get a single entity by its ID from the database
+    async getById(id) {
         const db = await dbPromise;
-        return db.get('SELECT * FROM teams WHERE id = ?', id);
+        const result = await db.get(`SELECT * FROM ${this.tableName} WHERE id = ?`, id);
+        return result ? { ...result, data: JSON.parse(result.data) } : null;
     }
 
-    async addTeam(team) {
+    // Create a new entity in the database
+    async create(data) {
         const db = await dbPromise;
-        const { name, country, founded, league } = team;
-        const result = await db.run('INSERT INTO teams (name, country, founded, league) VALUES (?, ?, ?, ?)', [name, country, founded, league]);
-        return { id: result.lastID, ...team };
+        const result = await db.run(
+            `INSERT INTO ${this.tableName} (data) VALUES (?)`,
+            [JSON.stringify(data)]
+        );
+        return this.getById(result.lastID);
     }
 
-    async updateTeam(id, team) {
+    // Update an entity in the database
+    async update(id, data) {
         const db = await dbPromise;
-        await db.run('UPDATE teams SET name = ?, country = ?, founded = ?, league = ? WHERE id = ?', [team.name, team.country, team.founded, team.league, id]);
-        return this.getTeamById(id);
+        await db.run(
+            `UPDATE ${this.tableName} SET data = ? WHERE id = ?`,
+            [JSON.stringify(data), id]
+        );
+        return this.getById(id);
     }
 
-    async deleteTeam(id) {
+    // Delete an entity from the database
+    async delete(id) {
         const db = await dbPromise;
-        await db.run('DELETE FROM teams WHERE id = ?', id);
+        await db.run(`DELETE FROM ${this.tableName} WHERE id = ?`, id);
     }
 }
 
